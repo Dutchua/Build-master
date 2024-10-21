@@ -2,17 +2,19 @@ import os
 import datetime
 import pytz
 from dotenv import load_dotenv
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
 load_dotenv()
+scheduler = AsyncIOScheduler()
 
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 FILE_PATH = 'build_masters.txt'
 TIMEZONE = 'Africa/Johannesburg'
 CHAT_ID = os.getenv('CHAT_ID')
 
-last_pinned_message_id = None  # Initialized globally
+last_pinned_message_id = None
 
 def read_build_masters_from_file(file_path):
     try:
@@ -36,34 +38,7 @@ def get_next_build_master(build_masters, current_build_master_index):
     current_build_master_index = (current_build_master_index + 1) % len(build_masters)
     return build_masters[current_build_master_index], current_build_master_index
 
-def schedule_weekly_message(application):
-    tz = pytz.timezone(TIMEZONE)
-    
-    now = datetime.datetime.now(tz=tz)
-    
-    next_monday = now + datetime.timedelta((7 - now.weekday()) % 7)
-    next_monday = next_monday.replace(hour=17, minute=0, second=0, microsecond=0)
-    
-    if next_monday <= now:
-        next_monday += datetime.timedelta(days=7)
-
-    application.job_queue.run_repeating(
-        next_command,
-        interval=datetime.timedelta(weeks=1),
-        first_time=next_monday.astimezone(tz).replace(tzinfo=None)
-    )
-
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Hey! Bot is active.")
-
-async def coolest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Josh is the coolest person in this group ❤️")
-
-async def get_chat_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.message.chat_id
-    await update.message.reply_text(f"The chat ID is: {chat_id}")
-
-async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def send_weekly_message(context: ContextTypes.DEFAULT_TYPE):
     build_masters, current_build_master_index, _ = read_build_masters_from_file(FILE_PATH)
     next_build_master, updated_index = get_next_build_master(build_masters, current_build_master_index)
     write_build_masters_to_file(FILE_PATH, build_masters, updated_index, None)
@@ -75,17 +50,35 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await context.bot.send_message(
-    chat_id=CHAT_ID,
-    text=f"{next_build_master}, you're next in the build master rotation. Are you ready to build master?",
-    reply_markup=reply_markup
-)
+        chat_id=CHAT_ID,
+        text=f"{next_build_master}, you're next in the build master rotation. Are you ready to master builds?",
+        reply_markup=reply_markup
+    )
+
+def schedule_weekly_message(application):
+    scheduler.add_job(send_weekly_message, 'cron', day_of_week='mon', hour=8, minute=0, args=[application])
+    scheduler.start()
+
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Hey! Bot is active.")
+
+async def coolest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Josh is the coolest person in this group❤️")
+
+async def get_chat_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.message.chat_id
+    await update.message.reply_text(f"The chat ID is: {chat_id}")
+
+async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await send_weekly_message(context)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
         "Here are the commands you can use:\n"
         "/start - Start the bot\n"
-        "/help - Show this help message\n"
         "/next - Get the next build master in the rotation\n"
+        "/who_is_the_coolest - Find out who the coolest in the group is (beta)\n"
+        "/help - Show this help message\n"
         "/stop - Stop the bot"
     )
     await update.message.reply_text(help_text)
@@ -122,9 +115,9 @@ async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == '__main__':
     print("Bot has started")
-
-    app = Application.builder().token(TOKEN).build()
+    app = ApplicationBuilder().token(TOKEN).build()
     
+    schedule_weekly_message(app)
     app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('next', next_command))
     app.add_handler(CommandHandler('get_chat_id', get_chat_id))
