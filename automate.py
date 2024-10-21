@@ -42,7 +42,7 @@ def schedule_weekly_message(application):
     now = datetime.datetime.now(tz=tz)
     
     next_monday = now + datetime.timedelta((7 - now.weekday()) % 7)
-    next_monday = next_monday.replace(hour=8, minute=0, second=0, microsecond=0)
+    next_monday = next_monday.replace(hour=17, minute=0, second=0, microsecond=0)
     
     if next_monday <= now:
         next_monday += datetime.timedelta(days=7)
