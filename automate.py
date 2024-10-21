@@ -92,8 +92,9 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     build_masters, current_build_master_index, last_pinned_message_id = read_build_masters_from_file(FILE_PATH)
     next_build_master = build_masters[current_build_master_index]
 
-    if query.data == 'ready':
-        if user == next_build_master:
+    if user == next_build_master:
+        if query.data == 'ready':
+        
             await query.edit_message_text(text=f"{user} has confirmed and is now the master of builds!")
 
             if last_pinned_message_id is not None:
@@ -103,12 +104,14 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.pin_chat_message(chat_id=query.message.chat.id, message_id=last_pinned_message_id)
 
             write_build_masters_to_file(FILE_PATH, build_masters, current_build_master_index, last_pinned_message_id)
+
+        elif query.data == 'not_ready':
+            await query.edit_message_text(text=f"{user} is not ready to master the build. Next person will be notified.")
+            next_command()
         else:
-            await query.answer("You're not the next build master!", show_alert=True)
-    elif query.data == 'not_ready':
-        await query.edit_message_text(text=f"{user} is not ready to master the build. Next person will be notified.")
+            await query.answer("Unknown action!", show_alert=True)
     else:
-        await query.answer("Unknown action!", show_alert=True)
+        await query.answer("You're not the next build master!", show_alert=True)
 
 async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"Update: {update} \nError: {context.error}")
