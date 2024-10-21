@@ -13,9 +13,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-        env:
-          TELEGRAMTOKEN: ${{ secrets.TELEGRAMTOKEN }}
-
       - name: Set up Python
         uses: actions/setup-python@v5 
         with:
@@ -26,3 +23,5 @@ jobs:
           python -m pip install python-dotenv
           python -m pip install python-telegram-bot 
           python automate.py
+        env:
+          TELEGRAMTOKEN: ${{ secrets.TELEGRAMTOKEN }}
