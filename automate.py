@@ -1,12 +1,16 @@
 import os
+import datetime
+import pytz
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 load_dotenv()
 
-TOKEN = os.getenv('TELEGRAMTOKEN')
+TOKEN = os.getenv('TELEGRAM_TOKEN')
 FILE_PATH = 'build_masters.txt'
+TIMEZONE = 'Africa/Johannesburg'
+CHAT_ID = os.getenv('CHAT_ID')
 
 last_pinned_message_id = None  # Initialized globally
 
@@ -32,8 +36,32 @@ def get_next_build_master(build_masters, current_build_master_index):
     current_build_master_index = (current_build_master_index + 1) % len(build_masters)
     return build_masters[current_build_master_index], current_build_master_index
 
+def schedule_weekly_message(application):
+    tz = pytz.timezone(TIMEZONE)
+    
+    now = datetime.datetime.now(tz=tz)
+    
+    next_monday = now + datetime.timedelta((7 - now.weekday()) % 7)
+    next_monday = next_monday.replace(hour=8, minute=0, second=0, microsecond=0)
+    
+    if next_monday <= now:
+        next_monday += datetime.timedelta(days=7)
+
+    application.job_queue.run_repeating(
+        next_command,
+        interval=datetime.timedelta(weeks=1),
+        first_time=next_monday.astimezone(tz).replace(tzinfo=None)
+    )
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Hey! Bot is active.")
+
+async def coolest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Josh is the coolest person in this group ❤️")
+
+async def get_chat_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.message.chat_id
+    await update.message.reply_text(f"The chat ID is: {chat_id}")
 
 async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     build_masters, current_build_master_index, _ = read_build_masters_from_file(FILE_PATH)
@@ -46,7 +74,11 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await update.message.reply_text(f"{next_build_master}, you're next in the build master rotation. Are you ready to build master?", reply_markup=reply_markup)
+    await context.bot.send_message(
+    chat_id=CHAT_ID,
+    text=f"{next_build_master}, you're next in the build master rotation. Are you ready to build master?",
+    reply_markup=reply_markup
+)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
@@ -95,8 +127,10 @@ if __name__ == '__main__':
     
     app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('next', next_command))
+    app.add_handler(CommandHandler('get_chat_id', get_chat_id))
     app.add_handler(CommandHandler('help', help_command))
     app.add_handler(CommandHandler('stop', stop_command))
+    app.add_handler(CommandHandler('who_is_the_coolest', coolest_command))
     app.add_handler(CallbackQueryHandler(button))
     app.add_error_handler(error)
 
