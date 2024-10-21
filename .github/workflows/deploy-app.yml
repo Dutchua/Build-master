@@ -23,5 +23,6 @@ jobs:
       
       - name: Run Python script
         run: |
-          python -m pip install python-dotenv, python-telegram-bot 
+          python -m pip install python-dotenv
+          python -m pip install python-telegram-bot 
           python automate.py
