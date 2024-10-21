@@ -107,7 +107,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         elif query.data == 'not_ready':
             await query.edit_message_text(text=f"{user} is not ready to master the build. Next person will be notified.")
-            next_command()
+            await next_command(update, context)
         else:
             await query.answer("Unknown action!", show_alert=True)
     else:
