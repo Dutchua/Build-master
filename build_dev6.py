@@ -1,6 +1,5 @@
 import os
-import datetime
-import pytz
+import logging
 from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -10,15 +9,15 @@ load_dotenv()
 scheduler = AsyncIOScheduler()
 
 TOKEN = os.getenv('TELEGRAM_TOKEN')
-FILE_PATH = 'build_masters.txt'
+FILE_PATH = 'build_dev6_list.txt'
 TIMEZONE = 'Africa/Johannesburg'
-CHAT_ID = os.getenv('CHAT_ID')
+CHAT_ID = os.getenv('DEV6_CHAT_ID')
 
 last_pinned_message_id = None
 
-def read_build_masters_from_file(file_path):
+def read_build_masters_from_file():
     try:
-        with open(file_path, 'r') as file:
+        with open(FILE_PATH, 'r') as file:
             lines = file.read().splitlines()
             build_masters = lines[:-2]
             current_build_master_index = int(lines[-2])
@@ -27,8 +26,8 @@ def read_build_masters_from_file(file_path):
     except FileNotFoundError:
         return ["Josh", "Brent", "Justin"], 0, None
 
-def write_build_masters_to_file(file_path, build_masters, current_build_master_index, last_pinned_message_id):
-    with open(file_path, 'w') as file:
+def write_build_masters_to_file(build_masters, current_build_master_index, last_pinned_message_id):
+    with open(FILE_PATH, 'w') as file:
         for build_master in build_masters:
             file.write(f"{build_master}\n")
         file.write(f"{current_build_master_index}\n")
@@ -39,9 +38,9 @@ def get_next_build_master(build_masters, current_build_master_index):
     return build_masters[current_build_master_index], current_build_master_index
 
 async def send_weekly_message(context: ContextTypes.DEFAULT_TYPE):
-    build_masters, current_build_master_index, _ = read_build_masters_from_file(FILE_PATH)
+    build_masters, current_build_master_index, _ = read_build_masters_from_file()
     next_build_master, updated_index = get_next_build_master(build_masters, current_build_master_index)
-    write_build_masters_to_file(FILE_PATH, build_masters, updated_index, None)
+    write_build_masters_to_file(build_masters, updated_index, None)
 
     keyboard = [
         [InlineKeyboardButton("Yes, I'm ready", callback_data='ready')],
@@ -63,7 +62,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Hey! Bot is active.")
 
 async def coolest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Josh is the coolest person in this group❤️")
+    build_masters, current_build_master_index, pin= read_build_masters_from_file()
+    current_build_master = build_masters[current_build_master_index]
+    await update.message.reply_text(f'The current master builder is: {current_build_master}')
 
 async def get_chat_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.message.chat_id
@@ -77,7 +78,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Here are the commands you can use:\n"
         "/start - Start the bot\n"
         "/next - Get the next build master in the rotation\n"
-        "/who_is_the_coolest - Find out who the coolest in the group is (beta)\n"
+        "/who_is_the_coolest - Find out who the build master is this week (beta)\n"
         "/help - Show this help message\n"
         "/stop - Stop the bot"
     )
@@ -89,7 +90,7 @@ async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user = query.from_user.first_name
-    build_masters, current_build_master_index, last_pinned_message_id = read_build_masters_from_file(FILE_PATH)
+    build_masters, current_build_master_index, last_pinned_message_id = read_build_masters_from_file()
     next_build_master = build_masters[current_build_master_index]
 
     if user == next_build_master:
@@ -103,7 +104,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_pinned_message_id = query.message.message_id
             await context.bot.pin_chat_message(chat_id=query.message.chat.id, message_id=last_pinned_message_id)
 
-            write_build_masters_to_file(FILE_PATH, build_masters, current_build_master_index, last_pinned_message_id)
+            write_build_masters_to_file(build_masters, current_build_master_index, last_pinned_message_id)
 
         elif query.data == 'not_ready':
             await query.edit_message_text(text=f"{user} is not ready to master the build. Next person will be notified.")
@@ -117,7 +118,7 @@ async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"Update: {update} \nError: {context.error}")
 
 if __name__ == '__main__':
-    print("Bot has started")
+
     app = ApplicationBuilder().token(TOKEN).build()
     
     schedule_weekly_message(app)
@@ -130,5 +131,4 @@ if __name__ == '__main__':
     app.add_handler(CallbackQueryHandler(button))
     app.add_error_handler(error)
 
-    print("Polling...")  
     app.run_polling(poll_interval=3)
