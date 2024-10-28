@@ -38,9 +38,10 @@ def get_next_build_master(build_masters, current_build_master_index):
     return build_masters[current_build_master_index], current_build_master_index
 
 async def send_weekly_message(context: ContextTypes.DEFAULT_TYPE):
-    build_masters, current_build_master_index, _ = read_build_masters_from_file()
+    build_masters, current_build_master_index, last_pinned_message_id = read_build_masters_from_file()
     next_build_master, updated_index = get_next_build_master(build_masters, current_build_master_index)
-    write_build_masters_to_file(build_masters, updated_index, None)
+
+    write_build_masters_to_file(build_masters, updated_index, last_pinned_message_id)
 
     keyboard = [
         [InlineKeyboardButton("Yes, I'm ready", callback_data='ready')],
@@ -95,7 +96,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if user == next_build_master:
         if query.data == 'ready':
-        
             await query.edit_message_text(text=f"{user} has confirmed and is now the master of builds!")
 
             if last_pinned_message_id is not None:
