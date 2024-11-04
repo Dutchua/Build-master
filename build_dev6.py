@@ -13,35 +13,31 @@ FILE_PATH = 'build_dev6_list.txt'
 TIMEZONE = 'Africa/Johannesburg'
 CHAT_ID = os.getenv('DEV6_CHAT_ID')
 
-last_pinned_message_id = None
-
 def read_build_masters_from_file():
     try:
         with open(FILE_PATH, 'r') as file:
             lines = file.read().splitlines()
-            build_masters = lines[:-2]
-            current_build_master_index = int(lines[-2])
-            last_pinned_message_id = lines[-1] if lines[-1] != 'None' else None
-        return build_masters, current_build_master_index, last_pinned_message_id
+            build_masters = lines[:-1]
+            current_build_master_index = int(lines[-1])
+        return build_masters, current_build_master_index
     except FileNotFoundError:
         return ["Josh", "Brent", "Justin"], 0, None
 
-def write_build_masters_to_file(build_masters, current_build_master_index, last_pinned_message_id):
+def write_build_masters_to_file(build_masters, current_build_master_index):
     with open(FILE_PATH, 'w') as file:
         for build_master in build_masters:
             file.write(f"{build_master}\n")
         file.write(f"{current_build_master_index}\n")
-        file.write(str(last_pinned_message_id) + '\n')
 
 def get_next_build_master(build_masters, current_build_master_index):
     current_build_master_index = (current_build_master_index + 1) % len(build_masters)
     return build_masters[current_build_master_index], current_build_master_index
 
 async def send_weekly_message(context: ContextTypes.DEFAULT_TYPE):
-    build_masters, current_build_master_index, last_pinned_message_id = read_build_masters_from_file()
+    build_masters, current_build_master_index = read_build_masters_from_file()
     next_build_master, updated_index = get_next_build_master(build_masters, current_build_master_index)
 
-    write_build_masters_to_file(build_masters, updated_index, last_pinned_message_id)
+    write_build_masters_to_file(build_masters, updated_index)
 
     keyboard = [
         [InlineKeyboardButton("Yes, I'm ready", callback_data='ready')],
@@ -61,6 +57,7 @@ def schedule_weekly_message(application):
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Hey! Bot is active.")
+    print(f'The chat id: {update.message.chat_id}')
 
 async def coolest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     build_masters, current_build_master_index, pin= read_build_masters_from_file()
@@ -79,7 +76,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Here are the commands you can use:\n"
         "/start - Start the bot\n"
         "/next - Get the next build master in the rotation\n"
-        "/who_is_the_coolest - Find out who the build master is this week (beta)\n"
+        "/who_is_the_coolest - Find out who the build master is this week\n"
         "/help - Show this help message\n"
         "/stop - Stop the bot"
     )
@@ -91,20 +88,12 @@ async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user = query.from_user.first_name
-    build_masters, current_build_master_index, last_pinned_message_id = read_build_masters_from_file()
+    build_masters, current_build_master_index = read_build_masters_from_file()
     next_build_master = build_masters[current_build_master_index]
 
     if user == next_build_master:
         if query.data == 'ready':
             await query.edit_message_text(text=f"{user} has confirmed and is now the master of builds!")
-
-            if last_pinned_message_id is not None:
-                await context.bot.unpin_chat_message(chat_id=query.message.chat.id, message_id=last_pinned_message_id)
-
-            last_pinned_message_id = query.message.message_id
-            await context.bot.pin_chat_message(chat_id=query.message.chat.id, message_id=last_pinned_message_id)
-
-            write_build_masters_to_file(build_masters, current_build_master_index, last_pinned_message_id)
 
         elif query.data == 'not_ready':
             await query.edit_message_text(text=f"{user} is not ready to master the build. Next person will be notified.")
