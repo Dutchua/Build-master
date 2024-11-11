@@ -60,7 +60,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f'The chat id: {update.message.chat_id}')
 
 async def coolest_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    build_masters, current_build_master_index, pin= read_build_masters_from_file()
+    build_masters, current_build_master_index = read_build_masters_from_file()
     current_build_master = build_masters[current_build_master_index]
     await update.message.reply_text(f'The current master builder is: {current_build_master}')
 
